@@ -36,53 +36,59 @@ const Noise = ({
     patternCanvas.height = patternSize;
     const patternCtx = patternCanvas.getContext('2d');
     const patternData = patternCtx.createImageData(patternSize, patternSize);
-    const data = patternData.data;
-    const totalPixels = patternSize * patternSize; // 预先计算像素总数
+    const totalPixels = patternSize * patternSize;
 
-    // 根据设备像素比调整 canvas 尺寸和缩放
+    // 将传入的 patternAlpha 限定在 0～255 内，并转为整数
+    const clampedAlpha = Math.max(0, Math.min(255, Math.floor(patternAlpha)));
+
+    // 根据设备像素比调整主 canvas 尺寸和缩放
     const resizeCanvas = () => {
       const dpr = window.devicePixelRatio || 1;
       canvas.width = window.innerWidth * dpr;
       canvas.height = window.innerHeight * dpr;
+      // 重置当前变换矩阵
       if (ctx.resetTransform) {
         ctx.resetTransform();
+      } else {
+        ctx.setTransform(1, 0, 0, 1, 0, 0);
       }
+      // 依据设备像素比及自定义缩放因子进行缩放
       ctx.scale(patternScaleX * dpr, patternScaleY * dpr);
     };
 
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
-    // 更新离屏噪点图案数据
+    // 使用 Uint32Array 优化生成噪点数据（适用于小端系统）
     const updatePattern = () => {
-      // 遍历每个像素，使用位运算确保整数化
-      for (let i = 0; i < totalPixels; i++) {
-        const offset = i * 4;
-        // 使用 (Math.random() * 256) | 0 快速获得 0~255 内的整数
-        const value = (Math.random() * 256) | 0;
-        data[offset] = value;       // R
-        data[offset + 1] = value;   // G
-        data[offset + 2] = value;   // B
-        data[offset + 3] = patternAlpha; // A
+      const buf32 = new Uint32Array(patternData.data.buffer);
+      for (let i = 0; i < buf32.length; i++) {
+        // 生成一个随机灰度值 (0～255)
+        const v = (Math.random() * 256) | 0;
+        // 由于 ImageData 内部采用 RGBA 排列，但 Uint32Array 在小端系统中内存布局为 ABGR，
+        // 因此组装像素数据时：(clampedAlpha << 24) | (v << 16) | (v << 8) | v 刚好得到 (R,G,B,A)
+        buf32[i] = (clampedAlpha << 24) | (v << 16) | (v << 8) | v;
       }
       patternCtx.putImageData(patternData, 0, 0);
     };
 
-    // 将离屏图案绘制到主 canvas 上
+    // 将离屏噪点图案绘制到主 canvas 上
     const drawGrain = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
       const pattern = ctx.createPattern(patternCanvas, 'repeat');
-      ctx.fillStyle = pattern;
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (pattern) {
+        ctx.fillStyle = pattern;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
     };
 
-    // 初次生成噪点图案
+    // 初次生成并绘制噪点
     updatePattern();
     drawGrain();
 
     let lastUpdate = performance.now();
 
-    // 利用 requestAnimationFrame 控制刷新频率
+    // 使用 requestAnimationFrame 控制刷新（同时保证刷新间隔约等于 patternRefreshInterval）
     const animate = (time) => {
       if (time - lastUpdate >= patternRefreshInterval) {
         updatePattern();
@@ -106,11 +112,11 @@ const Noise = ({
       style={{
         opacity: fadeOpacity,
         transition: fadeTransition,
+        willChange: 'opacity', // 提示浏览器提前优化 opacity 渲染
       }}
     >
       <canvas
         ref={grainRef}
-        className="w-full h-full"
         style={{
           display: 'block',
           width: '100%',
