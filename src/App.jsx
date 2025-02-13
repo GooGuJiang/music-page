@@ -3,6 +3,10 @@ import BlurText from "./TextAnimations/BlurText/BlurText";
 import Noise from './Animations/Noise/Noise';
 import { motion, AnimatePresence } from "motion/react";
 import { Fireworks } from '@fireworks-js/react';
+import ReactRain from 'react-rain-animation';
+
+// import all the styles
+import "react-rain-animation/lib/style.css";
 
 // -------------------------
 // 缓动函数库
@@ -20,12 +24,12 @@ const Easing = {
 class BaseEffect {
   constructor(config) {
     this.type = config.type;
-    this.start = config.start;       // 特效开始时间（秒）
-    this.end = config.end;           // 特效结束时间（秒）
+    this.start = config.start;
+    this.end = config.end;
     this.params = config.params;
     this.ease = Easing[config.ease || 'easeInOutQuad'];
-    this.fadeIn = config.params.fadeIn || 1;  // 渐入时间（秒）
-    this.fadeOut = config.params.fadeOut || 1; // 渐出时间（秒）
+    this.fadeIn = config.params.fadeIn || 1;
+    this.fadeOut = config.params.fadeOut || 1;
   }
 
   calculateIntensity(currentTime) {
@@ -41,6 +45,24 @@ class BaseEffect {
     }
     const progress = 1 - ((currentTime - this.end) / this.fadeOut);
     return this.ease(progress);
+  }
+}
+
+// 新增元素动画类
+class ElementEffect extends BaseEffect {
+  applyParams(intensity) {
+    return {
+      elementId: this.params.elementId,
+      elements: this.params.elements.map(el => ({
+        ...el,
+        style: {
+          ...el.style,
+          opacity: intensity * (el.style?.opacity || 1)
+        }
+      })),
+      animationType: this.params.animationType,
+      duration: this.params.duration || 1
+    };
   }
 }
 
@@ -76,17 +98,26 @@ class FireworksEffectConfig extends BaseEffect {
   }
 }
 
+// 新增：雨滴效果配置类
+class RainEffectConfig extends BaseEffect {
+  applyParams(intensity) {
+    return {
+      // 可根据 intensity 调整 opacity
+      opacity: intensity * (this.params.opacity || 1),
+      options: this.params.options || {}
+    };
+  }
+}
+
 // 特效工厂：支持 noise、fireworks 以及 blur（如有需要）
 const createEffect = (config) => {
   switch (config.type) {
-    case 'noise':
-      return new NoiseEffect(config);
-    case 'fireworks':
-      return new FireworksEffectConfig(config);
-    case 'blur':
-      return new BlurEffect(config);
-    default:
-      return null;
+    case 'element': return new ElementEffect(config);
+    case 'noise': return new NoiseEffect(config);
+    case 'fireworks': return new FireworksEffectConfig(config);
+    case 'blur': return new BlurEffect(config);
+    case 'rain': return new RainEffectConfig(config);
+    default: return null;
   }
 };
 
@@ -121,6 +152,40 @@ const parseSRT = (srt) => {
   return lyrics;
 };
 
+
+const FloatingImage = ({ src, style }) => (
+  <motion.img
+    src={src}
+    style={style}
+    initial={{ y: 100, opacity: 0 }}
+    animate={{ y: 0, opacity: style.opacity }}
+    exit={{ y: -100, opacity: 0 }}
+    transition={{ type: "spring", stiffness: 100, damping: 20 }}
+    className="absolute w-40 h-40 object-contain"
+  />
+);
+
+const RotatingText = ({ content, style }) => (
+  <motion.div
+    style={style}
+    className="absolute"
+    animate={{ rotate: 360 }}
+    transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
+  >
+    {content}
+  </motion.div>
+);
+
+const BounceElement = ({ children, style }) => (
+  <motion.div
+    style={style}
+    animate={{ y: [0, -20, 0] }}
+    transition={{ duration: 2, repeat: Infinity }}
+  >
+    {children}
+  </motion.div>
+);
+
 // -------------------------
 // App 组件
 // -------------------------
@@ -139,22 +204,22 @@ function App() {
     { 
       type: 'noise',
       start: 1,
-      end: 12.5,
+      end: 12,
       params: {
         maxAlpha: 50,
         size: 300,
         fadeIn: 2.5,
-        fadeOut: 1
+        fadeOut: 0.5
       }
     },
     {
-      type: 'fireworks',
+      type: 'rain',
       start: 1,
-      end: 12.5,
+      end: 12,
       params: {
         opacity: 0.8,
         fadeIn: 2.5,
-        fadeOut: 1,
+        fadeOut: 0.5,
       }
     },
     {
@@ -168,7 +233,228 @@ function App() {
         fadeOut: 1
       }
     },
+    {
+      type: 'element',
+      start: 273.912566,
+      end: 275,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '10%',
+              top: '10%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 274.457747,
+      end: 275,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '90%',
+              top: '80%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 274.756824,
+      end: 275,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '10%',
+              top: '80%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 275.150489,
+      end: 276,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '30%',
+              top: '30%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start:  275.478986,
+      end: 276,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '85%',
+              top: '65%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start:  279.282881,
+      end: 280,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '85%',
+              top: '65%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start:  279.885029,
+      end: 280,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '45%',
+              top: '65%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    }
     
+    ,
+    {
+      type: 'element',
+      start: 283.924006,
+      end: 285,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '10%',
+              top: '10%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 284.594307,
+      end: 285,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '90%',
+              top: '80%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 284.844416,
+      end: 285,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '10%',
+              top: '80%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    },
+    {
+      type: 'element',
+      start: 285.443248,
+      end: 286,
+      params: {
+        elementId: 'unique-id',
+        animationType: 'float',
+        elements: [
+          {
+            type: 'image', // 或 text
+            src: '0fb6b06935729c877ec91db29f002984.jpg',
+            style: {
+              left: '30%',
+              top: '30%',
+              opacity: 0.8
+            }
+          }
+        ]
+      }
+    }
   ];
 
   const [activeEffects, setActiveEffects] = useState([]);
@@ -201,6 +487,32 @@ function App() {
       <AnimatePresence>
         {activeEffects.map((effect, index) => {
           switch (effect.type) {
+            case 'element':
+            return (
+              <motion.div
+                key={`element-${effect.params.elementId}-${index}`}
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 pointer-events-none"
+                transition={{ duration: 0.5 }}
+              >
+                {effect.params.elements.map((element, idx) => {
+                  switch (element.type) {
+                    case 'image':
+                      return <FloatingImage key={idx} {...element} />;
+                    case 'text':
+                      return element.animationType === 'rotate' ? (
+                        <RotatingText key={idx} {...element} />
+                      ) : (
+                        <BounceElement key={idx} {...element} />
+                      );
+                    default:
+                      return null;
+                  }
+                })}
+              </motion.div>
+            );
             case 'noise':
               return (
                 <motion.div
@@ -248,6 +560,29 @@ function App() {
                       width: '100%',
                       height: '100%',
                     }}
+                  />
+                </motion.div>
+              );
+              case 'rain':
+              return (
+                <motion.div
+                  key={`rain-${index}`}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: effect.params.opacity }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: effect.config.fadeIn }}
+                  style={{
+                    position: 'fixed',
+                    top: 0,
+                    left: 0,
+                    width: '100%',
+                    height: '100%',
+                    zIndex: 1,
+                    pointerEvents: 'none'
+                  }}
+                >
+                  <ReactRain
+                    numDrops="100"
                   />
                 </motion.div>
               );
@@ -474,33 +809,28 @@ function App() {
     <div className="h-screen bg-black text-white font-bold flex flex-col justify-center items-center">
       {renderEffects()}
       <div className="flex-1 flex items-center justify-center p-4 overflow-auto">
-        {currentLyric && !isClimax && (
-          <BlurText
-            key={currentIndex}
-            text={currentLyric}
-            animateBy="letters"
-            direction="top"
-            delay={lyricDelay}
-            className="text-6xl mb-8 text-center"
-            onAnimationComplete={() => {
-              console.log("动画结束, 当前歌词索引:", currentIndex);
-            }}
-          />
-        )}
-        {isClimax && (
-          <BlurText
-            key={"climax"}
-            text=""
-            animateBy="letters"
-            direction="top"
-            delay={lyricDelay}
-            className="text-6xl mb-8 text-center opacity-0"
-            onAnimationComplete={() => {
-              console.log("高潮部分动画结束");
-              setIsClimax(false);
-            }}
-          />
-        )}
+        <AnimatePresence mode="wait">
+          {currentLyric && !isClimax && (
+            <motion.div
+              key={currentLyric} // 使用歌词内容作为 key
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.6, ease: "easeInOut" }}
+              className="text-6xl mb-8 text-center"
+            >
+              <BlurText
+                text={currentLyric}
+                delay={lyricDelay}
+                animateBy="letters"
+                direction="top"
+                onAnimationComplete={() => {
+                  console.log("动画结束, 当前歌词索引:", currentIndex);
+                }}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       <audio
         ref={audioRef}

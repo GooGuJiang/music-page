@@ -1,86 +1,84 @@
-import { useRef, useEffect, useState, useMemo } from 'react';
-import { useSprings, animated } from '@react-spring/web';
+import { motion, AnimatePresence } from "motion/react"
+import { useMemo } from 'react'
 
 const BlurText = ({
   text = '',
   delay = 50,
   className = '',
-  animateBy = 'words', // 'words' 或 'letters'
-  direction = 'top',   // 'top' 或 'bottom'
-  threshold = 0.1,
-  rootMargin = '0px',
-  easing = 'easeOutCubic',
+  animateBy = 'words',
+  direction = 'top',
   onAnimationComplete,
-  triggerImmediately = true, // 是否立即触发动画
 }) => {
-  // 将文本拆分为单词或字符
-  const elements = useMemo(() => {
-    return animateBy === 'words' ? text.split(' ') : text.split('');
-  }, [text, animateBy]);
+  const elements = useMemo(() => 
+    animateBy === 'words' ? text.split(' ') : text.split(''),
+    [text, animateBy]
+  )
 
-  const [inView, setInView] = useState(triggerImmediately); // 默认立即触发动画
-  const ref = useRef(null);
+  // 优化后的动画配置
+  const transition = (index) => ({
+    delay: index * delay / 1000,
+    duration: 0.8,
+    ease: [0, 0.25, 0.25, 0.25] // 更平滑的缓动曲线
+  })
 
-  useEffect(() => {
-    if (triggerImmediately) return;
-    if (!ref.current) return;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setInView(true);
-          observer.unobserve(ref.current);
-        }
-      },
-      { threshold, rootMargin }
-    );
-    observer.observe(ref.current);
-    return () => observer.disconnect();
-  }, [triggerImmediately, threshold, rootMargin]);
-
-  // 定义动画初始状态：模糊、透明、位置偏移
-  const fromState = useMemo(() => ({
-    filter: 'blur(10px)',
-    opacity: 0,
-    transform: direction === 'top' ? 'translate3d(0,-50px,0)' : 'translate3d(0,50px,0)',
-  }), [direction]);
-
-  // 定义动画最终状态：清晰、完全显示、位置归位
-  const toState = useMemo(() => ({
-    filter: 'blur(0px)',
-    opacity: 1,
-    transform: 'translate3d(0,0,0)',
-  }), []);
-
-  // 为每个字/词创建动画配置，每个元素延时为 i * delay
-  const springs = useSprings(
-    elements.length,
-    elements.map((_, i) => ({
-      from: fromState,
-      to: inView ? toState : fromState,
-      delay: i * delay,
-      config: { easing },
-      onRest: i === elements.length - 1 ? () => {
-        if (onAnimationComplete) {
-          onAnimationComplete();
-        }
-      } : undefined,
-    }))
-  );
+  // 调整后的动画变量
+  const animationVariants = {
+    initial: (index) => ({
+      opacity: 0,
+      filter: 'blur(12px)',
+      y: direction === 'top' ? 12 : -12, // 减少位移幅度
+      x: 0
+    }),
+    enter: (index) => ({
+      opacity: 1,
+      filter: 'blur(0px)',
+      y: 0,
+      transition: transition(index)
+    }),
+    exit: (index) => ({
+      opacity: 0,
+      filter: 'blur(8px)', // 减少模糊度
+      y: direction === 'top' ? -12 : 12, // 对称位移
+      transition: {
+        ...transition(index),
+        duration: 0.6 // 更快的退出速度
+      }
+    })
+  }
 
   return (
-    <p ref={ref} className={`blur-text ${className} flex flex-wrap`}>
-      {springs.map((props, index) => (
-        <animated.span
-          key={index}
-          style={props}
-          className="inline-block"
+    <div className={`${className} inline-block relative`}>
+      <AnimatePresence 
+        mode="sync" // 改为同步模式
+        onExitComplete={onAnimationComplete}
+      >
+        <motion.span 
+          className="inline-block whitespace-pre-wrap break-words"
+          layout // 启用布局动画
+          transition={{ type: "spring", duration: 0.5 }}
         >
-          {elements[index] === ' ' ? '\u00A0' : elements[index]}
-          {animateBy === 'words' && index < elements.length - 1 && '\u00A0'}
-        </animated.span>
-      ))}
-    </p>
-  );
-};
+          {elements.map((element, index) => (
+            <motion.span
+              key={`${element}-${index}-${text}`} // 添加 text 到 key
+              custom={index}
+              variants={animationVariants}
+              initial="initial"
+              animate="enter"
+              exit="exit"
+              className="inline-block"
+              style={{ 
+                position: 'relative', // 相对定位防止布局错乱
+                transition: 'all 0.3s ease' // 添加基础过渡
+              }}
+            >
+              {element}
+              {animateBy === 'words' && index < elements.length - 1 && '\u00A0'}
+            </motion.span>
+          ))}
+        </motion.span>
+      </AnimatePresence>
+    </div>
+  )
+}
 
-export default BlurText;
+export default BlurText
